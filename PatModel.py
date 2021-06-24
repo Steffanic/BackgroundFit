@@ -1,6 +1,6 @@
 import numpy as np
 
-TRUNCATION_ORDER = 2
+TRUNCATION_ORDER = 3
 
 
 def reaction_plane_resolution(n:int, j:int) -> float:
@@ -14,10 +14,14 @@ def reaction_plane_resolution(n:int, j:int) -> float:
         return 0
 
 def reaction_plane_correlations(n:int, m:int, j:int) -> float:
-    if n in [2, 4, 6] and m in [2, 4, 6] and j==2:
+    if n==j and m==0:
         return 1
-    if (n in [3,5] or m in [3,5]) and j==2:
-        return 0
+    if n==2 and m==4 and j==2:
+        return 0.1
+    if n==4 and m==2 and j==2:
+        return 0.1
+    if n==4 and m==0 and j==2:
+        return 0.1
     else:
         return 0
 
@@ -41,15 +45,16 @@ def background_level( params:dict
         azimuth_region_center -- the center of this azimuthal region, usually denoted as phi_s in the literature
     '''
 
-    print(f"\n\n\n\n\n\n\n{params['N^t'] * params['N^a']}")
     pre_factor = (params["N^t"] * params["N^a"] * reaction_plane_order * azimuth_region_width) / ( 2 * (np.pi)**2 )
 
-    sum_factor = lambda k: params[f"v_{int(reaction_plane_order*k)}t"] \
+    sum_factor = lambda k: (0 if int(reaction_plane_order*k)>6 else params[f"v_{int(reaction_plane_order*k)}t"]) \
                             * (1 / (reaction_plane_order * k * azimuth_region_width)) \
                             * np.sin( reaction_plane_order * k * azimuth_region_width) \
                             * reaction_plane_resolution(reaction_plane_order * k, reaction_plane_order) \
                             * reaction_plane_correlations(reaction_plane_order * k, 0, reaction_plane_order) \
                             * np.cos(reaction_plane_order * k * azimuth_region_center)
+
+
 
     summation = np.sum([sum_factor(k) for k in range(1, TRUNCATION_ORDER+1)])
 
@@ -83,9 +88,9 @@ def effective_v_nt( params:dict
                     * reaction_plane_correlations(flow_order, 0, reaction_plane_order) \
                     * np.cos(flow_order * azimuth_region_center)
     
-    summand_prefactor = lambda k: params[f"v_{reaction_plane_order * k + flow_order}t"] \
+    summand_prefactor = lambda k: (0 if reaction_plane_order * k + flow_order>6 else params[f"v_{reaction_plane_order * k + flow_order}t"]) \
             * reaction_plane_correlations(np.abs(reaction_plane_order * k + flow_order), flow_order, reaction_plane_order) \
-                +  (0 if np.abs(reaction_plane_order * k - flow_order)==0 else params[f"v_{np.abs(reaction_plane_order * k - flow_order)}t"]) \
+                +  (0 if (np.abs(reaction_plane_order * k - flow_order)==0 or np.abs(reaction_plane_order * k - flow_order)>6) else params[f"v_{np.abs(reaction_plane_order * k - flow_order)}t"]) \
             * reaction_plane_correlations(np.abs(reaction_plane_order * k - flow_order), flow_order, reaction_plane_order) \
                     
     summand_postfactor = lambda k: (np.sin(reaction_plane_order * k * azimuth_region_width) \
@@ -99,7 +104,7 @@ def effective_v_nt( params:dict
 
     numerator = params[f"v_{flow_order}t"] + non_sum_term + summation
 
-    denominator_sum_factor = lambda k: (params[f"v_{reaction_plane_order*k}t"] \
+    denominator_sum_factor = lambda k: ((0 if reaction_plane_order * k>6 else params[f"v_{reaction_plane_order*k}t"]) \
                             * 1 / (reaction_plane_order * k * azimuth_region_width)) \
                             * np.sin( flow_order * azimuth_region_width) \
                             * reaction_plane_resolution(reaction_plane_order * k, reaction_plane_order) \
@@ -131,6 +136,8 @@ def effective_w_nt( params:dict
         azimuth_region_width -- the width of this azimuthal region, usually denoted as c in the literature
         azimuth_region_center -- the center of this azimuthal region, usually denoted as phi_s in the literature
     '''
+
+
     non_sum_term = 0
     if flow_order / reaction_plane_order == flow_order // reaction_plane_order:
         non_sum_term = 1 / (flow_order * azimuth_region_width) \
@@ -139,9 +146,9 @@ def effective_w_nt( params:dict
                     * reaction_plane_correlations(flow_order, 0, reaction_plane_order) \
                     * np.sin(flow_order * azimuth_region_center)
     
-    summand_prefactor = lambda k: params[f"v_{reaction_plane_order * k + flow_order}t"] \
+    summand_prefactor = lambda k: (0 if (reaction_plane_order * k + flow_order)>6 else params[f"v_{reaction_plane_order * k + flow_order}t"]) \
             * reaction_plane_correlations(np.abs(reaction_plane_order * k + flow_order), flow_order, reaction_plane_order) \
-                +  (0 if np.abs(reaction_plane_order * k - flow_order)==0 else params[f"v_{np.abs(reaction_plane_order * k - flow_order)}t"]) \
+                +  (0 if (np.abs(reaction_plane_order * k - flow_order)==0 or np.abs(reaction_plane_order * k - flow_order)>6) else params[f"v_{np.abs(reaction_plane_order * k - flow_order)}t"]) \
             * reaction_plane_correlations(np.abs(reaction_plane_order * k - flow_order), flow_order, reaction_plane_order) \
                     
     summand_postfactor = lambda k: (np.sin(reaction_plane_order * k * azimuth_region_width) \
@@ -155,7 +162,7 @@ def effective_w_nt( params:dict
 
     numerator = non_sum_term + summation
 
-    denominator_sum_factor = lambda k: (params[f"v_{reaction_plane_order*k}t"] \
+    denominator_sum_factor = lambda k: ((0 if reaction_plane_order * k>6 else params[f"v_{reaction_plane_order*k}t"]) \
                             * 1 / (reaction_plane_order * k * azimuth_region_width)) \
                             * np.sin( flow_order * azimuth_region_width) \
                             * reaction_plane_resolution(reaction_plane_order * k, reaction_plane_order) \
@@ -195,6 +202,6 @@ def background(   delta_phi:float
                             *np.cos(n * delta_phi) + effective_w_nt(params, n, reaction_plane_order, azimuth_region_width, azimuth_region_center) \
                             *np.sin(n * delta_phi))
 
-    summation = np.sum([summand(n) for n in range(1, TRUNCATION_ORDER+1)], axis=0)
+    summation = np.sum([summand(n) for n in range(1, 6+1)], axis=0)
 
     return B_tilde * (1 + 2 * summation)
